@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Calculator</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; }
+    body { display:flex; min-height:100vh; align-items:center; justify-content:center; background:#f6f7fb; margin:0; }
+    .calc { width: min(420px, 92vw); background:#fff; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:20px; }
+    .screen { height:84px; background:#0f172a; color:#e2e8f0; border-radius:12px; padding:16px; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
+    .expr { opacity:.7; font-size:14px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .value { font-size:32px; text-align:right; line-height:1.2; }
+    .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-top:16px; }
+    button { padding:16px; font-size:18px; border:none; border-radius:12px; background:#e5e7eb; cursor:pointer; transition:.15s; }
+    button:active { transform:translateY(1px); }
+    .op { background:#c7d2fe; }
+    .accent { background:#60a5fa; color:#fff; }
+    .danger { background:#fca5a5; }
+    .span-2 { grid-column: span 2; }
+  </style>
+</head>
+<body>
+  <div class="calc">
+    <div class="screen">
+      <div class="expr" id="expr"></div>
+      <div class="value" id="value">0</div>
+    </div>
+    <div class="grid">
+      <button class="danger" data-action="clear">AC</button>
+      <button data-action="sign">±</button>
+      <button data-action="percent">%</button>
+      <button class="op" data-op="/">÷</button>
+
+      <button data-num="7">7</button>
+      <button data-num="8">8</button>
+      <button data-num="9">9</button>
+      <button class="op" data-op="*">×</button>
+
+      <button data-num="4">4</button>
+      <button data-num="5">5</button>
+      <button data-num="6">6</button>
+      <button class="op" data-op="-">−</button>
+
+      <button data-num="1">1</button>
+      <button data-num="2">2</button>
+      <button data-num="3">3</button>
+      <button class="op" data-op="+">+</button>
+
+      <button class="span-2" data-num="0">0</button>
+      <button data-num=".">.</button>
+      <button class="accent" data-action="equals">=</button>
+    </div>
+  </div>
+
+  <script>
+    const valueEl = document.getElementById('value');
+    const exprEl = document.getElementById('expr');
+
+    let current = '0';      // ข้อความที่กำลังพิมพ์
+    let acc = null;         // ค่าที่สะสมไว้
+    let op = null;          // เครื่องหมายปัจจุบัน
+    let justEvaluated = false;
+
+    const fmt = n => {
+      const s = n.toString();
+      if (!isFinite(n)) return 'Error';
+      // ตัดทศนิยมยาวเกินไป
+      let out = Math.round(n * 1e12) / 1e12;
+      return out.toString();
+    };
+
+    function updateScreen() {
+      valueEl.textContent = current;
+      let e = '';
+      if (acc !== null) e += fmt(acc) + ' ';
+      if (op) e += op + ' ';
+      exprEl.textContent = e.trim();
+    }
+
+    function inputNumber(ch) {
+      if (justEvaluated) { current = '0'; justEvaluated = false; }
+      if (ch === '.') {
+        if (!current.includes('.')) current += '.';
+        return updateScreen();
+      }
+      if (current === '0') current = ch;
+      else current += ch;
+      updateScreen();
+    }
+
+    function setOp(nextOp) {
+      if (op && !justEvaluated) evaluate();
+      acc = parseFloat(current);
+      op = nextOp;
+      current = '0';
+      justEvaluated = false;
+      updateScreen();
+    }
+
+    function evaluate() {
+      if (op === null || acc === null) return;
+      const b = parseFloat(current);
+      let r = 0;
+      if (op === '+') r = acc + b;
+      if (op === '-') r = acc - b;
+      if (op === '*') r = acc * b;
+      if (op === '/') r = (b === 0 ? NaN : acc / b);
+      current = isFinite(r) ? fmt(r) : 'Error';
+      acc = null;
+      op = null;
+      justEvaluated = true;
+      updateScreen();
+    }
+
+    function clearAll() {
+      current = '0'; acc = null; op = null; justEvaluated = false; updateScreen();
+    }
+
+    function toggleSign() {
+      if (current === '0') return;
+      current = current.startsWith('-') ? current.slice(1) : '-' + current;
+      updateScreen();
+    }
+
+    function percent() {
+      current = fmt(parseFloat(current) / 100);
+      updateScreen();
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      if (btn.dataset.num !== undefined) {
+        const ch = btn.dataset.num;
+        if (ch === '.' && current.includes('.')) return;
+        inputNumber(ch);
+      } else if (btn.dataset.op) {
+        setOp(btn.dataset.op);
+      } else if (btn.dataset.action === 'equals') {
+        evaluate();
+      } else if (btn.dataset.action === 'clear') {
+        clearAll();
+      } else if (btn.dataset.action === 'sign') {
+        toggleSign();
+      } else if (btn.dataset.action === 'percent') {
+        percent();
+      }
+    });
+
+    // รองรับคีย์บอร์ด
+    document.addEventListener('keydown', (e) => {
+      const k = e.key;
+      if ((k >= '0' && k <= '9') || k === '.') inputNumber(k);
+      if (['+', '-', '*', '/'].includes(k)) setOp(k);
+      if (k === 'Enter' || k === '=') evaluate();
+      if (k === 'Escape') clearAll();
+      if (k === '%') percent();
+    });
+
+    updateScreen();
+  </script>
+</body>
+</html>
